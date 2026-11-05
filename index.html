@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>シフト収入計算ツール</title>
+<meta name="description" content="時給・固定手当・交通費と勤務パターン別の日数から月収の概算を計算。登録不要で、入力はこのブラウザに保存されます。">
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#1e293b;font-family:system-ui,-apple-system,sans-serif;padding:24px 14px}main{max-width:760px;margin:auto;background:#fff;border-radius:18px;padding:28px;box-shadow:0 6px 30px #0000000a}h1{font-size:25px;margin:0 0 8px}h2{font-size:18px;margin:28px 0 12px}.sub,.note{color:#64748b;line-height:1.7}.sub{margin:0 0 22px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}label{font-size:14px;display:block}input{width:100%;font:inherit;font-size:16px;padding:11px;border:1px solid #cbd5e1;border-radius:8px;margin-top:5px}button{font:inherit;cursor:pointer;border-radius:9px;padding:11px 14px;border:1px solid #cbd5e1;background:white;color:#1e293b}button.primary{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700}button.remove{color:#b91c1c;border-color:#fecaca}.shift{border:1px solid #dbe3ed;border-radius:12px;padding:16px;margin:12px 0}.shifthead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.shifthead strong{font-size:15px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.result{background:#eff6ff;border-radius:12px;padding:20px;margin-top:24px}.amount{font-size:32px;font-weight:750;color:#1d4ed8;margin:6px 0 12px}.detail{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #dbeafe}.detail:last-child{border-bottom:0}.note{font-size:12px;margin-top:20px}.status{font-size:13px;color:#475569;margin-top:12px;min-height:1.5em}@media(max-width:520px){main{padding:20px}.grid{grid-template-columns:1fr}.amount{font-size:28px}.shift{padding:12px}}
 </style>
@@ -12,6 +13,7 @@
 <main>
 <h1>シフト収入計算ツール</h1>
 <p class="sub">勤務パターンを登録して、1か月の給与見込みをまとめて計算できます。</p>
+<p class="note">勤務時間には休憩を含めてください。例：9:00〜17:00、休憩45分なら「8時間」「45分」。結果は税金・社会保険料などを引く前の金額で、手取り額ではありません。</p>
 <div class="grid">
 <label>時給（円）<input id="wage" type="number" min="0" step="any" value="1200"></label>
 <label>固定手当（円/月）<input id="allowance" type="number" min="0" step="any" value="18000"></label>
@@ -21,7 +23,7 @@
 <div id="shifts"></div>
 <div class="actions"><button id="add" type="button">＋ シフトを追加</button><button id="calculate" class="primary" type="button">給与を計算する</button></div>
 <div class="result" aria-live="polite">
-<div style="font-size:13px;color:#64748b">月間総支給額の概算</div>
+<div style="font-size:13px;color:#64748b">月間総支給額の概算（控除前・交通費込み）</div>
 <div class="amount" id="total">— 円</div>
 <div class="detail"><span>月間実働時間</span><strong id="hoursTotal">—</strong></div>
 <div class="detail"><span>基本給</span><strong id="base">—</strong></div>
@@ -29,7 +31,9 @@
 <div class="detail"><span>交通費</span><strong id="transportOut">—</strong></div>
 </div>
 <p id="status" class="status" role="status"></p>
-<p class="note">※勤務時間は休憩を含む拘束時間として入力してください。深夜・時間外・休日割増、税金、社会保険料は未対応です。交通費も含む支給額の概算であり、実際の給与とは異なる場合があります。入力内容はこのブラウザ内にのみ保存されます。共有端末では使用にご注意ください。</p>
+<button id="recover" type="button" hidden>元の保存データを破棄し、現在の入力で保存し直す</button>
+<p class="note">※深夜・時間外・休日割増、税金、社会保険料は未対応です。交通費も含む支給額の概算であり、実際の給与とは異なる場合があります。実働時間は小数第2位、金額は1円単位に四捨五入して表示します。計算には丸める前の実働時間を使います。</p>
+<p class="note">入力が有効なとき、このブラウザ内に自動保存します。端末・ブラウザ間での同期はできず、ブラウザのデータ削除などで消えることがあります。共有端末では使用にご注意ください。</p>
 </main>
 <script>
 'use strict';
@@ -39,6 +43,7 @@ const shiftsEl=document.getElementById('shifts');
 const statusEl=document.getElementById('status');
 const fields=['name','hours','breakMinutes','days'];
 let shifts=defaultShifts.map(s=>({...s}));
+let preserveInvalidSavedData=false;
 const yen=n=>Math.round(n).toLocaleString('ja-JP')+'円';
 const num=id=>Number(document.getElementById(id).value);
 function render(){
@@ -48,10 +53,11 @@ function render(){
     const head=document.createElement('div');head.className='shifthead';
     const title=document.createElement('strong');title.textContent='シフト '+(i+1);
     const remove=document.createElement('button');remove.type='button';remove.className='remove';remove.textContent='削除';
+    remove.setAttribute('aria-label','シフト '+(i+1)+' を削除');
     remove.addEventListener('click',()=>{shifts.splice(i,1);render();calculate();});
     head.append(title,remove);card.append(head);
     const grid=document.createElement('div');grid.className='grid';
-    const labels={name:'シフト名',hours:'1日の勤務時間（時間）',breakMinutes:'1日の休憩時間（分）',days:'月間勤務日数（日）'};
+    const labels={name:'シフト名',hours:'1日の勤務時間（休憩込み・時間）',breakMinutes:'1日の休憩時間（分）',days:'月間勤務日数（日）'};
     fields.forEach(key=>{
       const label=document.createElement('label');label.textContent=labels[key];
       const input=document.createElement('input');input.type=key==='name'?'text':'number';
@@ -64,6 +70,7 @@ function render(){
   });
 }
 function calculate(){
+  if(shifts.length===0){statusEl.textContent='シフトを1件以上追加してください。';clear();return;}
   const topIds=['wage','allowance','transport'];
   const topValues=topIds.map(id=>document.getElementById(id).value.trim());
   if(topValues.some(v=>v==='')||topValues.some(v=>!Number.isFinite(Number(v))||Number(v)<0)){
@@ -80,26 +87,41 @@ function calculate(){
     totalHours+=(h-b/60)*d;
   }
   const base=totalHours*num('wage');
-  document.getElementById('total').textContent=yen(base+num('allowance')+num('transport'));
+  const total=base+num('allowance')+num('transport');
+  if(![totalHours,base,total].every(Number.isFinite)){
+    statusEl.textContent='数値が大きすぎて計算できません。入力を確認してください。';clear();return;
+  }
+  document.getElementById('total').textContent=yen(total);
   document.getElementById('hoursTotal').textContent=Number(totalHours.toFixed(2)).toLocaleString('ja-JP')+'時間';
   document.getElementById('base').textContent=yen(base);
   document.getElementById('allowanceOut').textContent=yen(num('allowance'));
   document.getElementById('transportOut').textContent=yen(num('transport'));
   statusEl.textContent='';
+  if(preserveInvalidSavedData){statusEl.textContent='保存データを読み込めなかったため、初期値で表示しています。元の保存データを保護するため、この画面での変更は保存していません。';return;}
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify({wage:num('wage'),allowance:num('allowance'),transport:num('transport'),shifts}));}
   catch(e){statusEl.textContent='計算は完了しましたが、このブラウザでは入力内容を保存できませんでした。';}
 }
 function clear(){['total','hoursTotal','base','allowanceOut','transportOut'].forEach(id=>document.getElementById(id).textContent='—');}
+function validSavedData(saved){
+  const numeric=v=>(typeof v==='number'||typeof v==='string'&&v.trim()!=='')&&Number.isFinite(Number(v))&&Number(v)>=0;
+  return saved&&Array.isArray(saved.shifts)&&saved.shifts.length>0&&saved.shifts.length<=100&&
+    ['wage','allowance','transport'].every(k=>typeof saved[k]==='number'&&numeric(saved[k]))&&
+    saved.shifts.every(s=>s&&typeof s==='object'&&['hours','breakMinutes','days'].every(k=>numeric(s[k]))&&
+      Number(s.breakMinutes)<=Number(s.hours)*60&&Number.isInteger(Number(s.days)));
+}
 try{
-  const saved=JSON.parse(localStorage.getItem(STORAGE_KEY));
-  if(saved&&Array.isArray(saved.shifts)&&saved.shifts.length<=100&&['wage','allowance','transport'].every(k=>typeof saved[k]==='number'&&Number.isFinite(saved[k]))){
+  const raw=localStorage.getItem(STORAGE_KEY);
+  if(raw!==null){
+    const saved=JSON.parse(raw);
+    if(!validSavedData(saved))throw new Error('invalid saved data');
     shifts=saved.shifts.map(s=>({name:String(s.name??''),hours:s.hours,breakMinutes:s.breakMinutes,days:s.days}));
     ['wage','allowance','transport'].forEach(k=>document.getElementById(k).value=saved[k]);
   }
-}catch(e){}
+}catch(e){preserveInvalidSavedData=true;document.getElementById('recover').hidden=false;}
 ['wage','allowance','transport'].forEach(id=>document.getElementById(id).addEventListener('input',calculate));
 document.getElementById('add').addEventListener('click',()=>{if(shifts.length>=100){statusEl.textContent='登録できるシフトは100件までです。';return;}shifts.push({name:'新しいシフト',hours:8,breakMinutes:60,days:1});render();calculate();});
 document.getElementById('calculate').addEventListener('click',calculate);
+document.getElementById('recover').addEventListener('click',()=>{preserveInvalidSavedData=false;document.getElementById('recover').hidden=true;calculate();});
 render();calculate();
 </script>
 </body>
