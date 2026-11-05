@@ -6,6 +6,7 @@
 <title>シフト収入計算ツール</title>
 <meta name="description" content="時給・固定手当・交通費と勤務パターン別の日数から月収の概算を計算。登録不要で、入力はこのブラウザに保存されます。">
 <style>
+[hidden]{display:none!important}.panel{border:1px solid #dbe3ed;border-radius:12px;padding:18px;margin-top:24px}.panel h2{margin:0 0 10px}.help{font-size:14px;color:#475569;line-height:1.7;margin:8px 0 12px}.comparison{margin-top:16px;background:#f8fafc;border-radius:10px;padding:14px}.comparison table{border-collapse:collapse;width:100%;font-size:14px}.comparison th,.comparison td{text-align:right;padding:10px 4px;border-bottom:1px solid #dbe3ed;overflow-wrap:anywhere}.comparison th:first-child{text-align:left}.difference{font-size:20px;font-weight:700;color:#1d4ed8;margin:14px 0 0}.import-preview{border:1px solid #93c5fd;border-radius:10px;padding:14px;margin-top:14px}input[type=file]{padding:8px}button:disabled{cursor:not-allowed;opacity:.5}button:focus-visible,input:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 *{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#1e293b;font-family:system-ui,-apple-system,sans-serif;padding:24px 14px}main{max-width:760px;margin:auto;background:#fff;border-radius:18px;padding:28px;box-shadow:0 6px 30px #0000000a}h1{font-size:25px;margin:0 0 8px}h2{font-size:18px;margin:28px 0 12px}.sub,.note{color:#64748b;line-height:1.7}.sub{margin:0 0 22px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}label{font-size:14px;display:block}input{width:100%;font:inherit;font-size:16px;padding:11px;border:1px solid #cbd5e1;border-radius:8px;margin-top:5px}button{font:inherit;cursor:pointer;border-radius:9px;padding:11px 14px;border:1px solid #cbd5e1;background:white;color:#1e293b}button.primary{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700}button.remove{color:#b91c1c;border-color:#fecaca}.shift{border:1px solid #dbe3ed;border-radius:12px;padding:16px;margin:12px 0}.shifthead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.shifthead strong{font-size:15px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.result{background:#eff6ff;border-radius:12px;padding:20px;margin-top:24px}.amount{font-size:32px;font-weight:750;color:#1d4ed8;margin:6px 0 12px}.detail{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #dbeafe}.detail:last-child{border-bottom:0}.note{font-size:12px;margin-top:20px}.status{font-size:13px;color:#475569;margin-top:12px;min-height:1.5em}@media(max-width:520px){main{padding:20px}.grid{grid-template-columns:1fr}.amount{font-size:28px}.shift{padding:12px}}
 </style>
 </head>
@@ -32,6 +33,29 @@
 </div>
 <p id="status" class="status" role="status"></p>
 <button id="recover" type="button" hidden>元の保存データを破棄し、現在の入力で保存し直す</button>
+<section class="panel" aria-labelledby="compareHeading">
+<h2 id="compareHeading">勤務案の比較</h2>
+<p class="help">今の条件を1案保存してから、上の日数や時給を変更すると、月収・実働時間の差を比べられます。保存できる比較用の案は1つです。</p>
+<button id="saveComparison" type="button">現在の条件を比較用に保存</button>
+<div id="comparison" class="comparison" hidden>
+<div aria-live="polite">
+<table><caption class="help">控除前・交通費込みの概算</caption><thead><tr><th scope="col">項目</th><th scope="col">保存した案</th><th scope="col">現在の入力</th></tr></thead>
+<tbody><tr><th scope="row">月収</th><td id="referenceTotal">—</td><td id="currentTotal">—</td></tr><tr><th scope="row">実働時間</th><td id="referenceHours">—</td><td id="currentHours">—</td></tr></tbody></table>
+<p id="payDifference" class="difference">—</p><p id="hoursDifference" class="help"></p>
+</div>
+<div class="actions"><button id="restoreComparison" type="button">保存した案を入力欄に戻す</button><button id="removeComparison" type="button">比較用の案を削除</button></div>
+</div>
+</section>
+<section class="panel" aria-labelledby="backupHeading">
+<h2 id="backupHeading">バックアップ・復元</h2>
+<p class="help">現在の入力と比較用の案をファイルに保存できます。別の端末でも、このページでファイルを読み込めば復元できます。自動同期ではありません。</p>
+<button id="exportBackup" type="button">バックアップを保存</button>
+<label class="help" for="importBackup">保存したバックアップを読み込む（JSON・1MB以下）</label>
+<input id="importBackup" type="file" accept=".json,application/json" aria-describedby="backupPrivacy">
+<div id="importPreview" class="import-preview" hidden><p id="importSummary" class="help"></p><p class="help">適用すると、現在の入力と比較用の案を置き換えます。必要なら先にバックアップを保存してください。</p><div class="actions"><button id="applyImport" type="button" class="primary">この内容で置き換える</button><button id="cancelImport" type="button">キャンセル</button></div></div>
+<p id="backupStatus" class="status" role="status"></p>
+<p id="backupPrivacy" class="note">ファイルには入力した時給・手当・シフト名などが含まれます。読み込みは端末内で処理し、サーバーには送信しません。ファイルの保管・共有先にご注意ください。</p>
+</section>
 <p class="note">※深夜・時間外・休日割増、税金、社会保険料は未対応です。交通費も含む支給額の概算であり、実際の給与とは異なる場合があります。実働時間は小数第2位、金額は1円単位に四捨五入して表示します。計算には丸める前の実働時間を使います。</p>
 <p class="note">入力が有効なとき、このブラウザ内に自動保存します。端末・ブラウザ間での同期はできず、ブラウザのデータ削除などで消えることがあります。共有端末では使用にご注意ください。</p>
 </main>
@@ -44,8 +68,17 @@ const statusEl=document.getElementById('status');
 const fields=['name','hours','breakMinutes','days'];
 let shifts=defaultShifts.map(s=>({...s}));
 let preserveInvalidSavedData=false;
+let comparisonPlan=null;
+let pendingImport=null;
+let importReadId=0;
+let lastValidPlan=null;
+const backupStatus=document.getElementById('backupStatus');
 const yen=n=>Math.round(n).toLocaleString('ja-JP')+'円';
 const num=id=>Number(document.getElementById(id).value);
+const hours=n=>Number(n.toFixed(2)).toLocaleString('ja-JP')+'時間';
+function currentPlan(){return {wage:num('wage'),allowance:num('allowance'),transport:num('transport'),shifts:shifts.map(s=>({...s}))};}
+function normalisePlan(plan){return {wage:plan.wage,allowance:plan.allowance,transport:plan.transport,shifts:plan.shifts.map(s=>({name:String(s.name??''),hours:Number(s.hours),breakMinutes:Number(s.breakMinutes),days:Number(s.days)}))};}
+function applyPlan(plan){shifts=plan.shifts.map(s=>({...s}));['wage','allowance','transport'].forEach(k=>document.getElementById(k).value=plan[k]);render();}
 function render(){
   shiftsEl.replaceChildren();
   shifts.forEach((s,i)=>{
@@ -96,12 +129,21 @@ function calculate(){
   document.getElementById('base').textContent=yen(base);
   document.getElementById('allowanceOut').textContent=yen(num('allowance'));
   document.getElementById('transportOut').textContent=yen(num('transport'));
+  lastValidPlan=currentPlan();
+  document.getElementById('saveComparison').disabled=false;
+  document.getElementById('exportBackup').disabled=false;
+  renderComparison({total,totalHours});
   statusEl.textContent='';
   if(preserveInvalidSavedData){statusEl.textContent='保存データを読み込めなかったため、初期値で表示しています。元の保存データを保護するため、この画面での変更は保存していません。';return;}
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({wage:num('wage'),allowance:num('allowance'),transport:num('transport'),shifts}));}
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({...currentPlan(),comparison:comparisonPlan}));}
   catch(e){statusEl.textContent='計算は完了しましたが、このブラウザでは入力内容を保存できませんでした。';}
+  return {total,totalHours};
 }
-function clear(){['total','hoursTotal','base','allowanceOut','transportOut'].forEach(id=>document.getElementById(id).textContent='—');}
+function clear(){
+  ['total','hoursTotal','base','allowanceOut','transportOut'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById('saveComparison').disabled=true;document.getElementById('exportBackup').disabled=true;
+  renderComparison(null);
+}
 function validSavedData(saved){
   const numeric=v=>(typeof v==='number'||typeof v==='string'&&v.trim()!=='')&&Number.isFinite(Number(v))&&Number(v)>=0;
   return saved&&Array.isArray(saved.shifts)&&saved.shifts.length>0&&saved.shifts.length<=100&&
@@ -109,19 +151,102 @@ function validSavedData(saved){
     saved.shifts.every(s=>s&&typeof s==='object'&&['hours','breakMinutes','days'].every(k=>numeric(s[k]))&&
       Number(s.breakMinutes)<=Number(s.hours)*60&&Number.isInteger(Number(s.days)));
 }
+function totalsFor(plan){
+  const totalHours=plan.shifts.reduce((sum,s)=>sum+(Number(s.hours)-Number(s.breakMinutes)/60)*Number(s.days),0);
+  return {totalHours,total:totalHours*plan.wage+plan.allowance+plan.transport};
+}
+function usablePlan(plan){return validSavedData(plan)&&Object.values(totalsFor(plan)).every(Number.isFinite);}
+function renderComparison(current){
+  document.getElementById('comparison').hidden=!comparisonPlan;
+  if(!comparisonPlan)return;
+  const reference=totalsFor(comparisonPlan);
+  document.getElementById('referenceTotal').textContent=yen(reference.total);
+  document.getElementById('referenceHours').textContent=hours(reference.totalHours);
+  document.getElementById('currentTotal').textContent=current?yen(current.total):'—';
+  document.getElementById('currentHours').textContent=current?hours(current.totalHours):'—';
+  if(!current){document.getElementById('payDifference').textContent='入力を直すと差額を表示します。';document.getElementById('hoursDifference').textContent='';return;}
+  // Match the displayed whole-yen amounts, including half-yen rounding.
+  const diff=Math.round(current.total)-Math.round(reference.total);
+  const hoursDiff=Number((current.totalHours-reference.totalHours).toFixed(2));
+  document.getElementById('payDifference').textContent=diff===0?'月収の差：0円':('保存した案より '+yen(Math.abs(diff))+(diff>0?'増えます':'減ります'));
+  document.getElementById('hoursDifference').textContent='実働時間の差：'+(hoursDiff>0?'+':hoursDiff<0?'−':'')+hours(Math.abs(hoursDiff));
+}
+function createBackup(){
+  const plan=currentPlan();
+  if(!usablePlan(plan))throw new Error('入力内容を確認してから保存してください。');
+  return {app:'shift-pay',version:1,current:normalisePlan(plan),comparison:comparisonPlan?normalisePlan(comparisonPlan):null};
+}
+function parseBackup(text){
+  if(typeof text!=='string'||text.length>1000000)throw new Error('1MB以下のバックアップを選んでください。');
+  let data;try{data=JSON.parse(text);}catch(e){throw new Error('ファイルを読み込めません。このツールで保存したJSONファイルを選んでください。');}
+  if(!data||data.app!=='shift-pay'||data.version!==1||!usablePlan(data.current)||
+    !(data.comparison===null||usablePlan(data.comparison))){throw new Error('対応するバックアップではないか、数値に問題があります。現在の入力は変更していません。');}
+  return {current:normalisePlan(data.current),comparison:data.comparison?normalisePlan(data.comparison):null};
+}
+function stageImport(data){
+  pendingImport=data;
+  const result=totalsFor(data.current);
+  document.getElementById('importSummary').textContent='読み込み内容：シフト '+data.current.shifts.length+'件、月収 '+yen(result.total)+'、実働 '+hours(result.totalHours)+'。比較用の案：'+(data.comparison?'あり':'なし')+'。';
+  document.getElementById('importPreview').hidden=false;
+}
+function cancelImport(){
+  importReadId++;pendingImport=null;document.getElementById('importPreview').hidden=true;document.getElementById('importBackup').value='';
+}
 try{
   const raw=localStorage.getItem(STORAGE_KEY);
   if(raw!==null){
     const saved=JSON.parse(raw);
-    if(!validSavedData(saved))throw new Error('invalid saved data');
+    if(!usablePlan(saved)||(saved.comparison!=null&&!usablePlan(saved.comparison)))throw new Error('invalid saved data');
     shifts=saved.shifts.map(s=>({name:String(s.name??''),hours:s.hours,breakMinutes:s.breakMinutes,days:s.days}));
     ['wage','allowance','transport'].forEach(k=>document.getElementById(k).value=saved[k]);
+    comparisonPlan=saved.comparison?normalisePlan(saved.comparison):null;
   }
 }catch(e){preserveInvalidSavedData=true;document.getElementById('recover').hidden=false;}
 ['wage','allowance','transport'].forEach(id=>document.getElementById(id).addEventListener('input',calculate));
 document.getElementById('add').addEventListener('click',()=>{if(shifts.length>=100){statusEl.textContent='登録できるシフトは100件までです。';return;}shifts.push({name:'新しいシフト',hours:8,breakMinutes:60,days:1});render();calculate();});
 document.getElementById('calculate').addEventListener('click',calculate);
 document.getElementById('recover').addEventListener('click',()=>{preserveInvalidSavedData=false;document.getElementById('recover').hidden=true;calculate();});
+document.getElementById('saveComparison').addEventListener('click',()=>{
+  if(!calculate()&&!preserveInvalidSavedData)return;
+  if(document.getElementById('saveComparison').disabled)return;
+  comparisonPlan=normalisePlan(currentPlan());calculate();
+});
+document.getElementById('restoreComparison').addEventListener('click',()=>{if(comparisonPlan){applyPlan(comparisonPlan);calculate();}});
+document.getElementById('removeComparison').addEventListener('click',()=>{
+  comparisonPlan=null;
+  if(!calculate()&&lastValidPlan&&!preserveInvalidSavedData){
+    // Keep the last valid input when an unfinished edit cannot be saved yet.
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify({...lastValidPlan,comparison:null}));}
+    catch(e){statusEl.textContent+=' 比較用の案の削除は保存できませんでした。';}
+  }
+});
+document.getElementById('exportBackup').addEventListener('click',()=>{
+  try{
+    // Revalidate raw fields; an empty number input must not become zero in a backup.
+    calculate();if(document.getElementById('exportBackup').disabled)return;
+    const text=JSON.stringify(createBackup(),null,2);
+    const blob=new Blob([text],{type:'application/json;charset=utf-8'});
+    if(blob.size>1000000)throw new Error('バックアップが1MBを超えています。シフト名などを短くしてください。');
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download='shift-pay-backup.json';document.body.append(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+    backupStatus.textContent='バックアップのダウンロードを開始しました。端末の保存先を確認してください。';
+  }catch(e){backupStatus.textContent=e.message||'バックアップを保存できませんでした。';}
+});
+document.getElementById('importBackup').addEventListener('change',async event=>{
+  const file=event.target.files[0];cancelImport();const readId=importReadId;
+  if(!file)return;backupStatus.textContent='';
+  if(file.size>1000000){backupStatus.textContent='1MB以下のバックアップを選んでください。';return;}
+  try{const text=await file.text();if(readId!==importReadId)return;stageImport(parseBackup(text));}
+  catch(e){if(readId===importReadId)backupStatus.textContent=e.message||'ファイルを読み込めませんでした。現在の入力は変更していません。';}
+});
+document.getElementById('applyImport').addEventListener('click',()=>{
+  if(!pendingImport)return;
+  const data=pendingImport;applyPlan(data.current);comparisonPlan=data.comparison;
+  preserveInvalidSavedData=false;document.getElementById('recover').hidden=true;cancelImport();calculate();
+  backupStatus.textContent='バックアップの内容を復元しました。';
+});
+document.getElementById('cancelImport').addEventListener('click',()=>{cancelImport();backupStatus.textContent='読み込みをキャンセルしました。現在の入力は変更していません。';});
 render();calculate();
 </script>
 </body>
